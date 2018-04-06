@@ -9,25 +9,25 @@ import logging
 import time
 import datetime
 
-def generateURL(cik, accession):
-  # create the url with the given cik and accession number
-    logging.debug('Entered function generateURL')
+def get_url(cik, accession):
+    logging.debug('In the function : get_url')
+    cik = str(cik)
+    accession = str(accession)
     cik = cik.lstrip('0')
-    mid_acc = re.sub(r'[-]', r'', accession)
-    url = 'https://www.sec.gov/Archives/edgar/data/' + cik + '/' + mid_acc + '/' + accession + '/-index.htm'
-    logging.debug('Hitting the URL {} of CIK {} & Accession Number {}'.format(url, cik, accession))
+    acc = re.sub(r'[-]', r'', accession)
+    url = 'https://www.sec.gov/Archives/edgar/data/' + cik + '/' + acc + '/' + accession + '/-index.htm'
+    logging.debug('Calling the initial URL for CIK {} & Accession Number {} to open URL {}'.format(cik, acc, url))
     try:
         page_open = urllib.request.urlopen(url)
         if page_open.code == 200:
-            logging.debug("URL is valid")
-            extract10QURL(url)
+            logging.debug("URL Exisits")
+            get_final_url(url)
     except:
-        logging.error("Invalid URL {}: Please re-validate".format(url))
+        logging.debug("Invalid URL {}: Please re-validate".format(url))
         print("Invalid URL {}: Please re-validate".format(url))
 
 
-
-def extract10QURL(url):
+def get_final_url(url):
     final_url = ""
     logging.debug('In the function : get_final_url')
     html = urllib.request.urlopen(url)
@@ -49,33 +49,24 @@ def get_soup(url):
         logging.debug('In the function : get_soup')
         htmlpage = urllib.request.urlopen(url)
         page = BeautifulSoup(htmlpage, "html.parser")
-        find_tables(page)
+        find_all_tables(page)
     except:
         return None
 
 
-def find_tables(page):
+def find_all_tables(page):
     logging.debug('In the function : find_all_tables')
     all_divtables = page.find_all('table')
-    folder_name = foldername(page)
-    write_to_csv(page, all_divtables,folder_name)
+    find_all_datatables(page, all_divtables)
     return 0
 
 
 def foldername(page):
-    logging.info('Entered function createCompanyFolder')
-    all_p_tags=page.find_all('p')
-    for tags in all_p_tags:
-        p_tag=tags
-        tags=tags.text.replace("\n"," ")
-        if tags == '(Exact name of registrant as specified in its charter)':
-            prev_tag=p_tag.find_previous_sibling('p')
-            prev_tag=prev_tag.text.replace("\n"," ")
-            company_name=prev_tag.replace(" ","_")
-            logging.info('Folder name {} '.format(company_name))
-            break
-    return company_name
-
+    title = page.find('filename').contents[0]
+    if ".htm" in title:
+        foldername = title.split(".htm")
+        logging.debug('In the function : foldername{}  '.format(foldername[0]))
+        return foldername[0]
 
 
 def zip_dir(path_dir, path_file_zip=''):
@@ -98,7 +89,7 @@ def assure_path_exists(path):
         os.makedirs(path)
 
 
-def if_exists(param):
+def checktag(param):
     setflag = "false"
     datatabletags = ["background", "bgcolor", "background-color"]
     for x in datatabletags:
@@ -106,18 +97,8 @@ def if_exists(param):
             setflag = "true"
     return setflag
 
-def checkheadertag(param):
-    logging.debug('In a function : checkheadertag')
-    setflag="false"
-    datatabletags=["center","bold"]
-    for x in datatabletags:
-        if x in param:
-            setflag="true"
-    return setflag
-
-
 def extract_Table(table):
-    logging.debug('In a function : printtable')
+    logging.debug('In a function : extract_Table')
     printtable = [] 
     printtrs = table.find_all('tr')
     for tr in printtrs:
@@ -135,88 +116,75 @@ def extract_Table(table):
         printtable.append([elem.decode('utf-8').strip() for elem in data])
     return printtable
 
-def write_to_csv(page, all_divtables,company_name):
+def find_all_datatables(page, all_divtables):
     logging.debug('In a function : find_all_datatables')
     count = 0
     allheaders=[]
     for table in all_divtables:
-        logging.debug(len(all_divtables))
         datasets = []
         trs = table.find_all('tr')
         for tr in trs:
-            if if_exists(str(tr.get('style'))) == "true" or if_exists(str(tr)) == "true":
+            global flagtr
+            if checktag(str(tr.get('style'))) == "true" or checktag(str(tr)) == "true":
                 logging.debug('Checking data tables at Row Level')
-                datasets=extract_Table(tr.find_parent('table'))
-                count=count+1
+                datasets = extract_Table(tr.find_parent('table'))
                 break
             else:
                 tds = tr.find_all('td')
                 for td in tds:
-                    if if_exists(str(td.get('style'))) == "true" or if_exists(str(td)) == "true":
+                    if checktag(str(td.get('style'))) == "true" or checktag(str(td)) == "true":
                         logging.debug('Checking data tables at Column Level')
-                        datasets=extract_Table(td.find_parent('table'))
-                        count=count+1
+                        datasets = extract_Table(td.find_parent('table'))
                         break
             if not len(datasets) == 0:
                 break
-        #***************************** create a directory *************************************
         if not len(datasets) == 0:
             logging.debug('Total Number of data tables to be created {}'.format(len(datasets)))
             count += 1
-            ptag=table.find_previous('p');
-            while ptag is not None and checkheadertag(ptag.get('style'))=="false" and len(ptag.text)<=1:
-                ptag=ptag.find_previous('p')
-                if checkheadertag(ptag.get('style'))=="true" and len(ptag.text)>=2:
-                    global name
-                    name=re.sub(r"[^A-Za-z0-9]+","",ptag.text)
-                    if name in allheaders:
-                        hrcount+=1
-                        hrname=name+"_"+str(hrcount)
-                        allheaders.append(hrname)
-                    else:
-                        hrname=name
-                        allheaders.append(hrname)
-                        break
             folder_name = foldername(page)
             logging.debug('folder created with folder Name{}'.format(folder_name))
             path = str(os.getcwd()) + "/" + folder_name
             logging.debug('Path for csv creation {}'.format(path))
             assure_path_exists(path)
-            if(len(allheaders)==0):
-                filename=folder_name+"-"+str(count)
-            else:
-                filename=allheaders.pop()
+            filename=folder_name+"-"+str(count)
             csvname=filename+".csv"
             logging.debug('file creation Name{}'.format(csvname))
             csvpath = path + "/" + csvname
             logging.debug('CSV Path for the file creation {}'.format(csvpath))
             with open(csvpath, 'w', encoding='utf-8-sig', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerows(datasets)
+               writer = csv.writer(f)
+               for line in datasets: 
+                    line = [item.replace("\\xa0", " ") for item in line]
+                    line = [item.replace("\n", "") for item in line]
+                    line =[x for x in line if x]
+                    writer.writerow(line)
             zip_dir(path)
 
 
+
 def main():
-    sys_args = sys.argv[1:]
+    ts = time.time()
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
+    args = sys.argv[1:]
     cik = ''
     accession = ''
     counter = 0
-    if len(sys_args) == 0:
+    if len(args) == 0:
         cik = '0000051143'
         accession = '0000051143-13-000007'
-    for arg in sys_args:
+    for arg in args:
         if counter == 0:
             cik = str(arg)
         else:
             accession = str(arg)
         counter += 1
-    st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
-    logfilename = 'Edgar_log_files_'+ cik + '_' + st + '.txt' 
-    logging.basicConfig(filename=logfilename, level=logging.DEBUG,format='%(asctime)s - %(levelname)s - %(message)s')
-    logging.debug('Program execution begins.')
-    logging.debug('**************************')
-    logging.debug('Generating the URL with CIK Number {} and Accession number {}'.format(cik, accession))
-    generateURL(cik, accession)
+    logfilename = 'log_Edgar_'+ cik + '_' + st + '.txt' 
+    logging.basicConfig(filename=logfilename, level=logging.DEBUG,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug('Program Start')
+    logging.debug('*************')
+    logging.debug('Calling the initial URL with CIK Number {} and Accession number {}'.format(cik, accession))
+    get_url(cik, accession)
 
 
 if __name__ == '__main__':

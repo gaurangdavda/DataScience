@@ -16,7 +16,7 @@ import datetime
 
 def summary(all_data):
     data = pd.DataFrame()
-    data = data_set
+    data = all_data
     data.info()
     # describe the data that we have 
     data.describe()
@@ -47,13 +47,7 @@ def summary(all_data):
     data['COUNT'] = 1
     datagroup=pd.DataFrame(data)
     datagroup.to_csv(csvpath+"/LengthOfCikForAnomalyDetection.csv")
-  
-    # Per code count
-    status = data.groupby(['code']).count()  # sum function
-    status['COUNT']
-    summary=pd.DataFrame(status)
-    summary.to_csv(csvpath+"/PercodeCount.csv")
-    
+ 
     # Create a summary that groups cik by accession number
     summary2 = data['extention'].groupby(data['cik']).describe()
     summarycikdescribe = pd.DataFrame(summary2)
@@ -91,13 +85,15 @@ def replace_missingValues(df):
         #find
         df['find'].between(0.0,10.0).all()
         df['find']=df['find'].fillna(max_no_agent)
+        #crawler
+        df['crawler'] = df['crawler'].fillna(0)
       
-        return data
+        return df
 
 
 def change_dataTypes(df):
-    new_data = pd.DataFrame()
     logging.debug('In the function : change_dataTypes')
+    df = replace_missingValues(df)
     df['cik'] = df['cik'].astype('int64')
     df['code'] = df['code'].astype('object')
     df['size'] = df['size'].astype('int64')
@@ -105,19 +101,23 @@ def change_dataTypes(df):
     df['norefer'] = df['norefer'].astype('int64')
     df['noagent'] = df['noagent'].astype('int64')
     df['crawler'] = df['crawler'].astype('int64')
-    newdata = replace_missingValues(df)
-    newdata.to_csv("merged.csv",encoding='utf-8')
-    summary(newdata)
+    df.to_csv("merged.csv",encoding='utf-8')
+    summary(df)
     return 0
 
 
 def create_dataframe(path):
     logging.debug('In the function : create_dataframe')
-    all_data = pd.DataFrame()
-    for f in glob.glob(path + '/log*.csv'):
-        df = pd.read_csv(f, parse_dates=[1])
-        all_data = all_data.append(df, ignore_index=True)
-    return all_data
+    df = pd.DataFrame()
+    allFiles = glob.glob(path + '/log*.csv')
+    for file_ in allFiles:
+        df2 = pd.read_csv(file_,index_col=None, header=0) 
+        df=df.append(df2,ignore_index=True)
+        logging.debug("check")
+        del df2
+    print(df)
+    change_dataTypes(df)
+    return df
 
 
 def assure_path_exists(path):
@@ -136,8 +136,7 @@ def get_dataOnLocal(monthlistdata, year):
         with urlopen(month) as zipresp:
             with ZipFile(BytesIO(zipresp.read())) as zfile:
                 zfile.extractall(path)
-    df = create_dataframe(path)
-    change_dataTypes(df)
+    create_dataframe(path)
     return 0
 
 
@@ -177,8 +176,7 @@ def get_url(year):
 
 def valid_year(year):
     logging.debug('In the function : valid_year')
-    logYear = ['2003', '2004', '2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015',
-               '2016','2017','2018']
+    logYear = ['2003', '2004', '2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015','2016','2017','2018']
     for log in logYear:
         try:
             if year in log:
@@ -196,7 +194,7 @@ def main():
     year = ''
     counter = 0
     if len(args) == 0:
-        year = "2017"
+        year = "2003"
     for arg in args:
         if counter == 0:
             year= str(arg)

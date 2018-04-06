@@ -13,6 +13,7 @@ set -e
 : ${ACCESS_KEY:?"ACCESS_KEY env variable is required"}
 : ${SECRET_KEY:?"SECRET_KEY env variable is required"}
 : ${S3_PATH:?"S3_PATH env variable is required"}
+export DATA_PATH=${DATA_PATH:-/data/}
 
 echo "access_key=$ACCESS_KEY"
 echo "secret_key=$SECRET_KEY"
