@@ -1,0 +1,6 @@
+Name,Value,Validations,Description
+epochs,50,Any integer > 0,Number of iterations to train the CNN
+batch_size,256,Any integer > 0,Number of data points taken to process together at a particular time
+data_augmentation,1,0 or 1 (0 = False; 1 = True),Data augmentation performed if True
+num_classes,10,Any integer > 0,Maximum number of final outputs available
+workers,1,Any integer > 0,Number of threads to be executed on 1 core
