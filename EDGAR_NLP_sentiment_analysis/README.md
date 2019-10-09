@@ -1,0 +1,2 @@
+# EDGAR Sentiment Analysis
+This folder contains sentiment analysis for different company's earnings call transcripts pulled from EDGAR website. Different apis and predefined models and customized models are architected in the different *exp* folders and summarized in a report.
